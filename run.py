@@ -470,7 +470,7 @@ while True:
                             gc.attack(unit.id, targetUnit.id)
                             
                     if(len(enemies) > 0 and gc.is_move_ready(unit.id)):
-                        if((!gc.is_attack_ready(unit.id)) and (!gc.is_begin_snipe_ready(unit.id))):
+                        if((not gc.is_attack_ready(unit.id)) and (not gc.is_begin_snipe_ready(unit.id))):
                             nearestEnemy = findNearestUnit(ourMapLoc, enemies)
                             moveDir = getDirAwayTargetMapLocGreedy(gc, unit, nearestEnemy.location.map_location())
                             if(gc.can_move(unit.id, moveDir)):
