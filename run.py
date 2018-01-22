@@ -19,6 +19,7 @@ knownEnemyLocLimit = 30
 knownEnemyLocRefreshRate = 0.5
 
 resourceLoc = []
+Direction = bc.Direction
 
 knownEnemyStrcutureLoc = []
 
@@ -55,13 +56,13 @@ def decideProduction(n_ranger, n_mage, n_healer, n_knight, strategy):
     total = n_ranger + n_mage + n_healer + n_knight
     diff_ranger = n_ranger / total - 0.4
     diff_mage = n_mage / total - 0.2
-    diff_knight = n_kight / total - 0.3
+    diff_knight = n_knight / total - 0.3
     diff_healer = n_healer / total - 0.1
     
     if(min(diff_ranger,diff_mage,diff_healer, diff_knight) == diff_ranger):
         return bc.UnitType.Ranger
     elif(min(diff_ranger,diff_mage,diff_healer, diff_knight) == diff_knight):
-        return b.UnitType.Knight
+        return bc.UnitType.Knight
     elif(min(diff_ranger,diff_mage,diff_healer, diff_knight) == diff_mage):
         return bc.UnitType.Mage
     elif(min(diff_ranger,diff_mage,diff_healer, diff_knight) == diff_healer):
@@ -88,25 +89,25 @@ def updateKnownEnemyLocations(enemyLoc):
 
 def getDirToTargetMapLocGreedy(ourUnit, tarLoc):
     dirToTar = ourUnit.location.map_location().direction_to(tarLoc)
-    if (dirToTar == Direction.center):
+    if (dirToTar == Direction.Center):
         return dirToTar
     i = 0
     while(i < len(directions)):
         newLoc = directions[i]
         if(gc.can_move(ourUnit.id, newLoc)):
             return newLoc
-    return Direction.center  
+    return Direction.Center
         
 def getDirAwayTargetMapLocGreedy(gc, ourUnit, tarLoc):
-    dirToTar = tarLoc.direction_to(ourUnit.location.map_location());
-    if (dirToTar == Direction.center):
+    dirToTar = tarLoc.direction_to(ourUnit.location.map_location())
+    if (dirToTar == Direction.Center):
         return dirToTar
     i = 0
     while(i < len(directions)):
-        newLoc = directions[i]
-        if(gc.can_move(ourUnit.id, newLoc)):
-            return newLoc
-    return Direction.center
+        newDirection = directions[i]
+        if(gc.can_move(ourUnit.id, newDirection)):
+            return newDirection
+    return Direction.Center
 
 def findNearestLocation(ourLoc, otherLocs):
     minDist = 999999999
@@ -115,8 +116,8 @@ def findNearestLocation(ourLoc, otherLocs):
         dist = ourLoc.distance_squared_to(loc)
         if dist < minDist:
             minDist = dist
-            nearestLoc = otherLoc
-    return nearestLoc
+            neaerestLoc = loc
+    return neaerestLoc
     
 def getShuffledIndex(size):
     i = 0
@@ -140,6 +141,7 @@ def clearDuplicates(l):
     return list(seen2)
     
 def updateKnownReourceLocations(resLoc):
+    global resourceLoc
     resourceLoc.append(resLoc)
     resourceLoc = clearDuplicates(resourceLoc)
     
@@ -154,16 +156,16 @@ def getANearbyResourceLocation(worker):
     else:
         return None
         
-def findFriendToHeal(gc, healer, friendsInHealRange):
-    maploc = healer.location.map_location()
-    unitToHeal = None
+def findFriendToHeal(friendsInHealRange):
     maxHPLoss = -9999
+    unitToHeal = None
     for unit in friendsInHealRange:
-        HPLoss = unit.max_health() - unit.health()
-        if(HPLoss > maxHPLoss):
-            maxHPLoss = HPLoss
-            unitToHeal = unit
-    return unit
+        if unit.unit_type != bc.UnitType.Factory and unit.unit_type != bc.UnitType.Rocket:
+            HPLoss = unit.max_health - unit.health
+            if(HPLoss > maxHPLoss):
+                maxHPLoss = HPLoss
+                unitToHeal = unit
+    return unitToHeal
     
 def findNearestUnitJavelinInRange(knight, units):
     nearestUnit = units[0]
@@ -180,11 +182,11 @@ def findNearestUnitJavelinInRange(knight, units):
     return nearestUnit
         
 def getUnitsNeedHeal(units):
-    unitsInHelp = []
+    unitsNeedHeal = []
     for unit in units:
         if((unit.health / unit.max_health < 0.5) and (unit.unit_type != bc.UnitType.Factory) and (unit.unit_type != bc.UnitType.Rocket)) :
-            unitsInHelp.append(unit)
-    return unitsInHelp
+            unitsNeedHeal.append(unit)
+    return unitsNeedHeal
     
 def getUnitsNeedRepair(units):
     unitsNeedRepair = []
@@ -242,7 +244,7 @@ def getStructureToSnipe(ranger, units):
     return struc
     
 def findNearestUnit(ourMapLocation,units):
-    nearestUnit = units[0]
+    nearestUnit = None
     minDistance = 999999999
     for unit in units:
         otherLocation = unit.location.map_location()
@@ -254,15 +256,15 @@ def findNearestUnit(ourMapLocation,units):
 
 def findNearestUnit_Ranger(ranger, enemies):
     ourMapLoc = ranger.location.map_location()
-    nearestUnit = enemies[0]
+    nearestTargetUnit = None
     minDistance = 999999999
     for unit in enemies:
         otherLoc = unit.location.map_location()
         distanceSqr = ourMapLoc.distance_squared_to(otherLoc)
         if(distanceSqr < minDistance and gc.can_attack(ranger.id, unit.id)):
             minDistance = distanceSqr
-            nearestUnit = unit
-    return nearestUnit
+            nearestTargetUnit = unit
+    return nearestTargetUnit
     
 def findNearestUnit_Mage(mage, enemies):
     ourMapLoc = mage.location.map_location()
@@ -343,11 +345,16 @@ while True:
     try:
         # walk through our units:
         for unit in gc.my_units():
+
+            if not unit.location.is_on_map():
+                continue
+
             move_found = False
             #FACTORY LOGIC ###########################
             # simply unload anything and then produce knight if possible
             if unit.unit_type == bc.UnitType.Factory:
                 unitPro = decideProduction(n_ranger, n_mage, n_healer, n_knight, strat)
+
                 garrison = unit.structure_garrison()
                 if len(garrison) > 0:
                     for d in directions:
@@ -427,7 +434,7 @@ while True:
                 enemies = gc.sense_nearby_units_by_team(location.map_location(), unit.vision_range,enemy_team)
                 if(len(enemies) > 0):
                     updateKnownEnemyLocations(enemies[0].location.map_location())
-                    
+
                 if(location.is_on_map()):
                     ourMapLoc = location.map_location()
                     ## first, let's look for enemies in vision (not usre if -1 works?)
@@ -443,7 +450,7 @@ while True:
                             gc.move_robot(unit.id, dirToNearestEnemy)
                         if(gc.is_attack_ready(unit.id)  and gc.can_attack(unit.id,nearestEnemy.id)):
                             gc.attack(unit.id, nearestEnemy.id)
-                            
+
                     if (gc.is_move_ready(unit.id)): # if didn't move to an enemy, then move randomly
                         d = random.choice(directions)
                         if (gc.can_move(unit.id, d)):
@@ -452,47 +459,40 @@ while True:
             # Ranger LOGIC #####################################
             elif (unit.unit_type == bc.UnitType.Ranger):
                 location = unit.location
-                enemies = gc.sense_nearby_units_by_team(location.map_location(), unit.vision_range,enemy_team)
-                if(len(enemies) > 0):
-                    updateKnownEnemyLocations(enemies[0].location.map_location())
-                    
-                if(location.is_on_map()):
-                    ourMapLoc = location.map_location()
-                    enemies = gc.sense_nearby_units_by_team(location.map_location(),50,enemy_team)
-                    if(len(enemies) > 0 and (gc.is_attack_ready(unit.id) or gc.is_begin_snipe_ready(unit.id))):
-                        targetUnit = findNearestUnitInRangerAttackRange(unit, enemies)
-                        targetStructures = getEnemyStructure(enemies)
-                        if len(targetStructures) > 0:
-                          targetStructureLoc = targetStructures[0].location
-                          if((gc.is_begin_snipe_ready(unit.id)) and (gc.can_begin_snipe(unit.id, targetStructureLoc))):
-                              gc.begin_snipe(unit.id, targetStructureLoc)
-                        if((gc.is_attack_ready(unit.id)) and (gc.can_attack(unit.id, targetUnit.id))and(not unit.ranger_is_sniping())):
-                            gc.attack(unit.id, targetUnit.id)
-                            
-                    if(len(enemies) > 0 and gc.is_move_ready(unit.id)):
-                        if((not gc.is_attack_ready(unit.id)) and (not gc.is_begin_snipe_ready(unit.id))):
-                            nearestEnemy = findNearestUnit(ourMapLoc, enemies)
-                            moveDir = getDirAwayTargetMapLocGreedy(gc, unit, nearestEnemy.location.map_location())
-                            if(gc.can_move(unit.id, moveDir)):
-                                gc.move_robot(unit.id, moveDir)
-                        else:
-                            nearestEnemy = findNearestUnit(ourMapLoc, enemies)
-                            dist = unit.location.map_location().distance_squared_to(nearestEnemy.location.map_location())
-                            if(ranger_Engage_Option == True):
-                                if(dist < unit.ranger_cannot_attack_range()):
-                                    moveDir = getDirAwayTargetMapLocGreedy(gc, unit, nearestEnemy.location.map_location())
-                                else:
-                                    moveDir = getDirToTargetMapLocGreedy(gc, unit, nearestEnemy.location.map_location())
-                            else:
-                                safeDist = unit.attack_range() + rangerSafeAddtionalDistance
-                                if(dist < safeDist):
-                                    moveDir = getDirAwayTargetMapLocGreedy(gc, unit, nearestEnemy.location.map_location())
-                                else:
-                                    moveDir = getDirToTargetMapLocGreedy(gc, unit, nearestEnemy.location.map_location())
-                            
-                            if(gc.can_move(unit.id, moveDir)):
-                                gc.move_robot(unit.id, moveDir)
-                            
+                ourMapLoc = location.map_location()
+                uid = unit.id
+                enemiesInVision = gc.sense_nearby_units_by_team(location.map_location(), unit.vision_range,enemy_team)
+                if(len(enemiesInVision) > 0):# if there are enemies in sight
+                    updateKnownEnemyLocations(enemiesInVision[0].location.map_location())
+                    if gc.is_attack_ready(uid):
+                        targetEnemy = findNearestUnit_Ranger(unit,enemiesInVision)
+                        if targetEnemy and gc.can_attack(uid,targetEnemy.id): # same as if it is not None
+                            gc.attack(uid,targetEnemy.id)
+
+                if gc.is_move_ready(uid):
+                    # if len(enemiesInVision)>0:#if there are enemies in sight
+                    #     if gc.is_attack_ready(uid):# if haven't attacked, then move to try to attack
+                    #         nearestEnemy = findNearestUnit(ourMapLoc,enemiesInVision)
+                    #         dir = getDirToTargetMapLocGreedy(unit,nearestEnemy.location.map_location())
+                    #         if gc.can_move(uid,dir):
+                    #             gc.move_robot(uid,dir)
+                    #
+                    # else: # if there are no enemies in sight
+                    #     if len(knownEnemyLoc) > 0:
+                    #         nearestEnemyLocation = findNearestLocation(ourMapLoc, knownEnemyLoc)
+                    #         dir = getDirToTargetMapLocGreedy(unit, nearestEnemyLocation)
+                    #         if gc.can_move(uid, dir):
+                    #             gc.move_robot(uid, dir)
+                    #     else:
+                    d = random.choice(directions)
+                    if gc.can_move(uid, d):
+                        gc.move_robot(uid, d)
+
+                if gc.is_attack_ready(uid):# if can attack after movement
+                    targetEnemy = findNearestUnit_Ranger(unit,enemiesInVision)
+                    if targetEnemy and gc.can_attack(uid, targetEnemy.id):  # same as if it is not None
+                        gc.attack(uid, targetEnemy.id)
+
             # Mage LOGIC #####################################
             elif unit.unit_type == bc.UnitType.Mage:
                 knight_moved = False
@@ -500,7 +500,7 @@ while True:
                 enemies = gc.sense_nearby_units_by_team(location.map_location(), unit.vision_range,enemy_team)
                 if(len(enemies) > 0):
                     updateKnownEnemyLocations(enemies[0].location.map_location())
-                    
+
                 if location.is_on_map():
                     ourMapLoc = location.map_location()
                     if len(enemies)>0:
@@ -518,33 +518,31 @@ while True:
             # HEALER LOGIC #####################################
             elif (unit.unit_type == bc.UnitType.Healer):
                 location = unit.location
-                enemies = gc.sense_nearby_units_by_team(location.map_location(), unit.vision_range,enemy_team)
-                if(len(enemies) > 0):
-                    updateKnownEnemyLocations(enemies[0].location.map_location())
-                
-                if(location.is_on_map()):
-                    ourMapLoc = location.map_location()
-                    unitsInHelp = getUnitsNeedHeal(gc.my_units())
-                    if (len(unitsInHelp) > 0):
-                        nearestInHelp = findFriendToHeal(gc, unit, unitsInHelp)
-                        dirToNearestInHelp = ourMapLoc.direction_to(nearestInHelp.location.map_location())
-                        if(gc.is_move_ready(unit.id) and gc.can_move(unit.id, dirToNearestInHelp)):
-                            gc.move_robot(unit.id, nearestInHelp)
-                        if(gc.is_heal_ready(unit.id) and gc.can_heal(unit.id,nearestInHelp.id)):
-                            gc.heal(unit.id, nearestInHelp.id)
-                            
-                    if (gc.is_move_ready(unit.id)): # if didn't move to an enemy, then move randomly
-                        # qiuqiu: unitsInHelp may be empty
-                        if len(unitsInHelp) > 0:
-                            c = random.choice(unitsInHelp)
-                            d = getDirToTargetMapLocGreedy(gc, unit, c)
-                            if (gc.can_move(unit.id, d)):
-                                gc.move_robot(unit.id, d)
-                        else:
-                            if gc.is_move_ready(unit.id): # if didn't move to an enemy, then move randomly
-                                d = random.choice(directions)
-                            if gc.can_move(unit.id, d):
-                                gc.move_robot(unit.id, d)
+                ourMapLoc = location.map_location()
+
+                nearbyFriendlyUnits = gc.sense_nearby_units_by_team(location.map_location(),
+                                                                    unit.attack_range(), my_team)
+                friendlyUnitToHeal = findFriendToHeal(nearbyFriendlyUnits)
+
+                if friendlyUnitToHeal is not None:
+                    dirToNearestInHelp = ourMapLoc.direction_to(friendlyUnitToHeal.location.map_location())
+                    if (gc.is_move_ready(unit.id) and gc.can_move(unit.id, dirToNearestInHelp)):
+                        gc.move_robot(unit.id, dirToNearestInHelp)
+                    if (gc.is_heal_ready(unit.id) and gc.can_heal(unit.id, friendlyUnitToHeal.id)):
+                        gc.heal(unit.id, friendlyUnitToHeal.id)
+
+                elif (gc.is_move_ready(unit.id)):  # if didn't move to heal, then move randomly
+                    # unitsNeedHeal = getUnitsNeedHeal(gc.units())
+                    # if len(unitsNeedHeal) > 0:
+                    #    c = random.choice(unitsNeedHeal)
+                    #    d = getDirToTargetMapLocGreedy(unit, c.location.map_location())
+                    #    if (gc.can_move(unit.id, d)):
+                    #        gc.move_robot(unit.id, d)
+                    # else:
+                    if gc.is_move_ready(unit.id):
+                        d = random.choice(directions)
+                    if gc.can_move(unit.id, d):
+                        gc.move_robot(unit.id, d)
 
     except Exception as e:
         print('Error:', e)
