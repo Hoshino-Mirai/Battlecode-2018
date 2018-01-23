@@ -68,6 +68,11 @@ def decideProduction(n_ranger, n_mage, n_healer, n_knight, strategy):
     elif(min(diff_ranger,diff_mage,diff_healer, diff_knight) == diff_healer):
         return bc.UnitType.Healer
 
+def isSuitableForBlitz(unit, strat):
+    if(strat != Strategy.Blitz):
+        return False
+        
+        
 def get_enemy(myteam):
     if myteam == bc.Team.Red:
         return bc.Team.Blue
@@ -94,6 +99,7 @@ def getDirToTargetMapLocGreedy(ourUnit, tarLoc):
     i = 0
     while(i < len(directions)):
         newLoc = directions[i]
+        i = i + 1
         if(gc.can_move(ourUnit.id, newLoc)):
             return newLoc
     return Direction.Center
@@ -105,6 +111,7 @@ def getDirAwayTargetMapLocGreedy(gc, ourUnit, tarLoc):
     i = 0
     while(i < len(directions)):
         newDirection = directions[i]
+        i = i + 1
         if(gc.can_move(ourUnit.id, newDirection)):
             return newDirection
     return Direction.Center
@@ -470,19 +477,19 @@ while True:
                             gc.attack(uid,targetEnemy.id)
 
                 if gc.is_move_ready(uid):
-                    # if len(enemiesInVision)>0:#if there are enemies in sight
-                    #     if gc.is_attack_ready(uid):# if haven't attacked, then move to try to attack
-                    #         nearestEnemy = findNearestUnit(ourMapLoc,enemiesInVision)
-                    #         dir = getDirToTargetMapLocGreedy(unit,nearestEnemy.location.map_location())
-                    #         if gc.can_move(uid,dir):
-                    #             gc.move_robot(uid,dir)
-                    #
-                    # else: # if there are no enemies in sight
-                    #     if len(knownEnemyLoc) > 0:
-                    #         nearestEnemyLocation = findNearestLocation(ourMapLoc, knownEnemyLoc)
-                    #         dir = getDirToTargetMapLocGreedy(unit, nearestEnemyLocation)
-                    #         if gc.can_move(uid, dir):
-                    #             gc.move_robot(uid, dir)
+                    if len(enemiesInVision)>0:#if there are enemies in sight
+                        if gc.is_attack_ready(uid):# if haven't attacked, then move to try to attack
+                            nearestEnemy = findNearestUnit(ourMapLoc,enemiesInVision)
+                            dir = getDirToTargetMapLocGreedy(unit,nearestEnemy.location.map_location())
+                            if gc.can_move(uid,dir):
+                                gc.move_robot(uid,dir)
+                    
+                    else: # if there are no enemies in sight
+                        if len(knownEnemyLoc) > 0:
+                            nearestEnemyLocation = findNearestLocation(ourMapLoc, knownEnemyLoc)
+                            dir = getDirToTargetMapLocGreedy(unit, nearestEnemyLocation)
+                            if gc.can_move(uid, dir):
+                                gc.move_robot(uid, dir)
                     #     else:
                     d = random.choice(directions)
                     if gc.can_move(uid, d):
